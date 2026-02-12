@@ -259,10 +259,18 @@ async def chat(request: ChatRequest, raw_request: Request):
             messages.append(assistant_message.model_dump())
 
             for tool_call in assistant_message.tool_calls:
-                func = tool_call['function']
-                tool_name = func['name']
+                if isinstance(tool_call, dict):
+                    func = tool_call['function']
+                    tool_name = func['name']
+                    raw_args = func.get('arguments', '{}')
+                    call_id = tool_call.get('id', tool_name)
+                else:
+                    func = tool_call.function
+                    tool_name = func.name
+                    raw_args = func.arguments or '{}'
+                    call_id = tool_call.id or tool_name
                 try:
-                    arguments = json.loads(func.get('arguments', '{}'))
+                    arguments = json.loads(raw_args)
                 except json.JSONDecodeError:
                     arguments = {}
 
@@ -275,7 +283,7 @@ async def chat(request: ChatRequest, raw_request: Request):
 
                 messages.append({
                     'role': 'tool',
-                    'tool_call_id': tool_call.get('id', tool_name),
+                    'tool_call_id': call_id,
                     'content': result,
                 })
 

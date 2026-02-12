@@ -4,6 +4,7 @@ import ConfigSidebar from './components/ConfigSidebar';
 import ChatPanel from './components/ChatPanel';
 import ProgressSidebar from './components/ProgressSidebar';
 import ApiKeyModal from './components/ApiKeyModal';
+import Toast from './components/Toast';
 import { createWebSocket } from './utils/ws';
 import { sendChatMessage, checkMissingKeys, setApiKeys } from './utils/api';
 
@@ -72,8 +73,19 @@ function App() {
   });
   const [taskState, setTaskState] = useState({ tasks: [] });
   const [missingProviders, setMissingProviders] = useState(null);
+  const [toasts, setToasts] = useState([]);
+  const toastIdRef = useRef(0);
   const pendingMessageRef = useRef(null);
   const wsRef = useRef(null);
+
+  const addToast = useCallback((message, type = 'error') => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const messages = sessions[activeSessionId]?.messages || [];
 
@@ -191,10 +203,7 @@ function App() {
         )
       );
     } catch {
-      updateMessages((prev) => [
-        ...prev,
-        { role: 'system', content: 'Failed to start GCRI task. Is the server running?' },
-      ]);
+      addToast('Failed to start GCRI task. Is the server running?');
     }
   }, [activeSessionId]);
 
@@ -251,10 +260,7 @@ function App() {
       }
     } catch {
       setIsWaitingResponse(false);
-      updateMessages((prev) => [
-        ...prev,
-        { role: 'system', content: 'Failed to reach the backend. Is the server running?' },
-      ]);
+      addToast('Failed to reach the backend. Is the server running?');
     }
   }, [config, sessions, activeSessionId]);
 
@@ -356,6 +362,7 @@ function App() {
         isWaitingResponse={isWaitingResponse}
       />
       <ProgressSidebar taskState={taskState} />
+      <Toast messages={toasts} onDismiss={dismissToast} />
       {missingProviders && (
         <ApiKeyModal
           missingProviders={missingProviders}

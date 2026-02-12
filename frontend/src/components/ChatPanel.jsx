@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import GcriProposalCard from './GcriProposalCard';
 
 export default function ChatPanel({
@@ -264,7 +265,11 @@ export default function ChatPanel({
               </div>
             ) : (
               <div style={{ position: 'relative', width: '100%' }} className="chat-message__content">
-                {message.content && <div>{message.content}</div>}
+                {message.content && (
+                  <div className="markdown-content">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                )}
                 {message.proposal && (
                   <GcriProposalCard
                     scheme={message.proposal}
