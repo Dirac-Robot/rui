@@ -198,7 +198,7 @@ body {
   color: var(--text-primary);
 }
 
-.chat-message__content:hover .edit-btn {
+.chat-message:hover .edit-btn {
   opacity: 1 !important;
 }
 

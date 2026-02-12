@@ -264,28 +264,15 @@ export default function ChatPanel({
                 </div>
               </div>
             ) : (
-              <div style={{ position: 'relative', width: '100%' }} className="chat-message__content">
-                {message.content && (
-                  <div className="markdown-content">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
-                )}
-                {message.proposal && (
-                  <GcriProposalCard
-                    scheme={message.proposal}
-                    onConfirm={onConfirmTask}
-                    confirmed={message.proposalConfirmed}
-                  />
-                )}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%' }}>
                 {message.role === 'user' && (
                   <button
                     className="edit-btn"
                     onClick={() => startEdit(index)}
                     title="Edit message"
                     style={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
+                      flexShrink: 0,
+                      marginTop: 2,
                       padding: '2px 6px',
                       fontSize: 11,
                       borderRadius: 'var(--radius-sm)',
@@ -298,6 +285,20 @@ export default function ChatPanel({
                     }}
                   >✏️</button>
                 )}
+                <div style={{ flex: 1, minWidth: 0 }} className="chat-message__content">
+                  {message.content && (
+                    <div className="markdown-content">
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
+                  )}
+                  {message.proposal && (
+                    <GcriProposalCard
+                      scheme={message.proposal}
+                      onConfirm={onConfirmTask}
+                      confirmed={message.proposalConfirmed}
+                    />
+                  )}
+                </div>
               </div>
             )}
           </div>

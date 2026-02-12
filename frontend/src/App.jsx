@@ -283,11 +283,21 @@ function App() {
   }, [config, doSendMessage]);
 
   const handleEditMessage = useCallback(async (index, newContent) => {
+    try {
+      const result = await checkMissingKeys(config);
+      if (result.missing?.length) {
+        pendingMessageRef.current = newContent;
+        setMissingProviders(result.missing);
+        return;
+      }
+    } catch {
+      // Backend not reachable — proceed anyway
+    }
     const currentMessages = sessions[activeSessionId]?.messages || [];
     const truncated = currentMessages.slice(0, index);
     updateMessages(truncated);
     setTimeout(() => doSendMessage(newContent), 50);
-  }, [sessions, activeSessionId, doSendMessage]);
+  }, [config, sessions, activeSessionId, doSendMessage]);
 
   const handleNewChat = useCallback(() => {
     const session = makeSession();

@@ -1,9 +1,11 @@
 import asyncio
 import json
-import os
 import threading
 
 from loguru import logger
+
+from gcri.config import scope
+from gcri.graphs.gcri_unit import GCRI
 
 
 _gcri_task_thread = None
@@ -18,14 +20,16 @@ def is_running():
     return _gcri_task_thread is not None and _gcri_task_thread.is_alive()
 
 
-def _build_gcri_config(rui_config):
-    """Build GCRI config using ato scope with RUI sidebar overrides."""
-    from gcri.config import scope, AGENT_NAMES_IN_BRANCH
+@scope
+def _build_config(config, rui_config=None):
+    """Get GCRI scope config with RUI sidebar overrides applied."""
+    from gcri.config import AGENT_NAMES_IN_BRANCH
     from ato.adict import ADict
 
-    config = scope.build()
+    if rui_config is None:
+        return config
 
-    num_branches = rui_config.get('branchCount', config.get('num_branches', 2))
+    num_branches = rui_config.get('branchCount', config.num_branches)
     config.num_branches = num_branches
 
     branches = rui_config.get('branches', [])
@@ -48,26 +52,6 @@ def _build_gcri_config(rui_config):
             branch_agents.append(branch_agents[-1])
         config.agents.branches = branch_agents
 
-    global_roles = rui_config.get('globalRoles', {})
-    role_map = {
-        'strategy_generator': 'strategy_generator',
-        'aggregator': 'aggregator',
-        'verifier': 'decision',
-        'decision': 'decision',
-        'memory': 'memory',
-    }
-    for ui_role, config_key in role_map.items():
-        if ui_role in global_roles and hasattr(config.agents, config_key):
-            agent_cfg = config.agents[config_key]
-            if isinstance(agent_cfg, dict):
-                agent_cfg['model_id'] = global_roles[ui_role]
-            else:
-                agent_cfg.model_id = global_roles[ui_role]
-
-    commit_mode = rui_config.get('commit_mode', 'manual')
-    if commit_mode == 'auto-accept':
-        config.protocols.accept_all = True
-
     config.dashboard.enabled = False
 
     return config
@@ -86,9 +70,7 @@ async def run_gcri_task(task_description, rui_config, ws_manager):
 
     def execute():
         try:
-            from gcri.graphs.gcri_unit import GCRI
-
-            config = _build_gcri_config(rui_config)
+            config = _build_config(rui_config=rui_config)
 
             asyncio.run_coroutine_threadsafe(
                 ws_manager.broadcast({
