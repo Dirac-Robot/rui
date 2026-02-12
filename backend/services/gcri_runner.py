@@ -5,6 +5,7 @@ import threading
 from loguru import logger
 
 from gcri.config import scope
+from gcri.graphs.callbacks import GCRICallbacks
 from gcri.graphs.gcri_unit import GCRI
 
 
@@ -18,6 +19,116 @@ def get_abort_event():
 
 def is_running():
     return _gcri_task_thread is not None and _gcri_task_thread.is_alive()
+
+
+class WebCallbacks(GCRICallbacks):
+    """GCRI Callbacks that broadcast events to RUI frontend via WebSocket."""
+
+    def __init__(self, ws_manager, loop):
+        self._ws = ws_manager
+        self._loop = loop
+
+    def _send(self, data):
+        asyncio.run_coroutine_threadsafe(self._ws.broadcast(data), self._loop)
+
+    def on_commit_request(self, context):
+        return True
+
+    def on_iteration_start(self, iteration, max_iterations):
+        self._send({
+            'type': 'phase_change',
+            'phase': 'strategy',
+            'iteration': iteration,
+            'maxIterations': max_iterations,
+        })
+
+    def on_iteration_complete(self, iteration, result):
+        decision = result.get('decision', False)
+        feedback = result.get('global_feedback', '')
+        evals = result.get('branch_evaluations', [])
+        safe_evals = []
+        for e in evals:
+            if hasattr(e, 'model_dump'):
+                e = e.model_dump(mode='json')
+            safe_evals.append({
+                'branch_index': e.get('branch_index', 0),
+                'status': str(e.get('status', '')),
+                'summary_hypothesis': str(e.get('summary_hypothesis', ''))[:300],
+                'summary_counter_example': str(e.get('summary_counter_example', ''))[:200],
+                'failure_category': str(e.get('failure_category', '')),
+            })
+        self._send({
+            'type': 'iteration_complete',
+            'iteration': iteration,
+            'decision': decision,
+            'feedback': (feedback or '')[:500],
+            'evaluations': safe_evals,
+        })
+
+    def on_phase_change(self, phase, iteration=0, **kwargs):
+        self._send({
+            'type': 'phase_change',
+            'phase': phase,
+            'iteration': iteration,
+        })
+
+    def on_strategies_generated(self, iteration, strategies):
+        safe = []
+        for s in strategies:
+            safe.append({
+                'name': s.get('name', ''),
+                'description': str(s.get('description', ''))[:300],
+                'hints': s.get('hints', [])[:5],
+            })
+        self._send({
+            'type': 'strategies',
+            'iteration': iteration,
+            'strategies': safe,
+        })
+
+    def on_hypothesis_generated(self, iteration, branch, hypothesis, strategy_name):
+        self._send({
+            'type': 'hypothesis',
+            'iteration': iteration,
+            'branch': branch,
+            'hypothesis': hypothesis[:300],
+            'strategyName': strategy_name,
+        })
+
+    def on_verification_complete(self, iteration, branch, counter_strength, counter_example):
+        self._send({
+            'type': 'verification',
+            'iteration': iteration,
+            'branch': branch,
+            'counterStrength': counter_strength,
+            'counterExample': counter_example[:300],
+        })
+
+    def on_decision(self, iteration, decision, best_branch, feedback, evaluations):
+        self._send({
+            'type': 'decision',
+            'iteration': iteration,
+            'decision': decision,
+            'bestBranch': best_branch,
+            'feedback': (feedback or '')[:500],
+        })
+
+    def on_task_complete(self, result, elapsed_seconds):
+        self._send({
+            'type': 'phase_change',
+            'phase': 'complete',
+            'elapsed': round(elapsed_seconds, 1),
+        })
+
+    def on_task_error(self, error):
+        self._send({
+            'type': 'system_message',
+            'content': f'GCRI task error: {str(error)}',
+        })
+        self._send({
+            'type': 'phase_change',
+            'phase': 'idle',
+        })
 
 
 @scope
@@ -75,31 +186,13 @@ async def run_gcri_task(task_description, rui_config, ws_manager):
     def execute():
         try:
             config = _build_config(rui_config=rui_config)
-
-            asyncio.run_coroutine_threadsafe(
-                ws_manager.broadcast({
-                    'type': 'phase_change',
-                    'phase': 'strategy',
-                    'iteration': 0,
-                }),
-                loop,
-            )
-
-            gcri = GCRI(config, abort_event=_abort_event)
+            callbacks = WebCallbacks(ws_manager, loop)
+            gcri = GCRI(config, abort_event=_abort_event, callbacks=callbacks)
             result = gcri(task=task_description)
-
-            asyncio.run_coroutine_threadsafe(
-                ws_manager.broadcast({
-                    'type': 'phase_change',
-                    'phase': 'complete',
-                }),
-                loop,
-            )
 
             logger.info(f'GCRI result type: {type(result).__name__}')
             if isinstance(result, dict):
                 logger.info(f'GCRI result keys: {list(result.keys())}')
-                logger.info(f'GCRI final_output value: {repr(result.get("final_output"))[:200]}')
 
             if result:
                 final_output = ''

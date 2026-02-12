@@ -158,6 +158,19 @@ function App() {
         tasks[tasks.length-1] = currentTask;
         return { tasks };
       });
+    } else if (data.type === 'strategies' || data.type === 'hypothesis' ||
+               data.type === 'verification' || data.type === 'decision' ||
+               data.type === 'iteration_complete') {
+      setTaskState((prev) => {
+        const tasks = [...prev.tasks];
+        if (tasks.length === 0) return prev;
+        const currentTask = { ...tasks[tasks.length-1] };
+        const details = [...(currentTask.details || [])];
+        details.push(data);
+        currentTask.details = details;
+        tasks[tasks.length-1] = currentTask;
+        return { tasks };
+      });
     } else if (data.type === 'chat_response') {
       setIsWaitingResponse(false);
       updateMessages((prev) => [

@@ -112,27 +112,24 @@ def get_comet_node_detail(node_id, depth=0):
 
 def get_gcri_memory(memory_path=None):
     """Read GCRI external memory JSON."""
-    if memory_path is None:
-        memory_path = Path.home() / '.gcri' / 'external_memory.json'
-    else:
-        memory_path = Path(memory_path)
+    candidates = []
+    if memory_path:
+        candidates.append(Path(memory_path))
+    candidates.append(Path.cwd() / '.gcri' / 'external_memory.json')
+    candidates.append(Path.home() / '.gcri' / 'external_memory.json')
 
-    if not memory_path.exists():
-        return {
-            'global_rules': [],
-            'domain_rules': {},
-            'knowledge': {},
-        }
+    for path in candidates:
+        if path.exists():
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                data['_source_path'] = str(path)
+                return data
+            except Exception as error:
+                logger.warning(f'Failed to read GCRI memory at {path}: {error}')
 
-    try:
-        with open(memory_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data
-    except Exception as error:
-        logger.warning(f'Failed to read GCRI memory: {error}')
-        return {
-            'global_rules': [],
-            'domain_rules': {},
-            'knowledge': {},
-            'error': str(error),
-        }
+    return {
+        'global_rules': [],
+        'domain_rules': {},
+        'knowledge': {},
+    }
