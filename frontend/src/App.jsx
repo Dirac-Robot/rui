@@ -165,10 +165,14 @@ function App() {
         { role: 'assistant', content: data.content },
       ]);
     } else if (data.type === 'system_message') {
-      updateMessages((prev) => [
-        ...prev,
-        { role: 'system', content: data.content },
-      ]);
+      if (data.content?.toLowerCase().includes('error')) {
+        addToast(data.content);
+      } else {
+        updateMessages((prev) => [
+          ...prev,
+          { role: 'system', content: data.content },
+        ]);
+      }
     }
   }, [activeSessionId]);
 
