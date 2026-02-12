@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import threading
-from pathlib import Path
 
 from loguru import logger
 
@@ -19,7 +18,62 @@ def is_running():
     return _gcri_task_thread is not None and _gcri_task_thread.is_alive()
 
 
-async def run_gcri_task(task_description, config, ws_manager):
+def _build_gcri_config(rui_config):
+    """Build GCRI config using ato scope with RUI sidebar overrides."""
+    from gcri.config import scope, AGENT_NAMES_IN_BRANCH
+    from ato.adict import ADict
+
+    config = scope.build()
+
+    num_branches = rui_config.get('branchCount', config.get('num_branches', 2))
+    config.num_branches = num_branches
+
+    branches = rui_config.get('branches', [])
+    if branches:
+        branch_agents = []
+        for branch in branches[:num_branches]:
+            model = branch.get('model', 'gpt-5-mini') if isinstance(branch, dict) else 'gpt-5-mini'
+            branch_agents.append({
+                agent_name: ADict(
+                    model_id=model,
+                    parameters=dict(max_tokens=25600, reasoning_effort='low'),
+                    gcri_options=ADict(
+                        use_code_tools=True,
+                        use_web_search=True,
+                        max_recursion_depth=None
+                    )
+                ) for agent_name in AGENT_NAMES_IN_BRANCH
+            })
+        while len(branch_agents) < num_branches:
+            branch_agents.append(branch_agents[-1])
+        config.agents.branches = branch_agents
+
+    global_roles = rui_config.get('globalRoles', {})
+    role_map = {
+        'strategy_generator': 'strategy_generator',
+        'aggregator': 'aggregator',
+        'verifier': 'decision',
+        'decision': 'decision',
+        'memory': 'memory',
+    }
+    for ui_role, config_key in role_map.items():
+        if ui_role in global_roles and hasattr(config.agents, config_key):
+            agent_cfg = config.agents[config_key]
+            if isinstance(agent_cfg, dict):
+                agent_cfg['model_id'] = global_roles[ui_role]
+            else:
+                agent_cfg.model_id = global_roles[ui_role]
+
+    commit_mode = rui_config.get('commit_mode', 'manual')
+    if commit_mode == 'auto-accept':
+        config.protocols.accept_all = True
+
+    config.dashboard.enabled = False
+
+    return config
+
+
+async def run_gcri_task(task_description, rui_config, ws_manager):
     global _gcri_task_thread
 
     if is_running():
@@ -33,27 +87,8 @@ async def run_gcri_task(task_description, config, ws_manager):
     def execute():
         try:
             from gcri.graphs.gcri_unit import GCRI
-            from ato.adict import ADict
 
-            gcri_config = ADict()
-            gcri_config.num_branches = config.get('branchCount', 3)
-
-            branches = config.get('branches', [])
-            if branches:
-                branch_models = []
-                for branch in branches:
-                    if isinstance(branch, dict) and 'strategy' in branch:
-                        branch_models.append(ADict(
-                            strategy=branch.get('strategy', 'gpt-4o'),
-                            hypothesis=branch.get('hypothesis', 'gpt-4o'),
-                            refiner=branch.get('refiner', 'gpt-4o'),
-                        ))
-                    else:
-                        model = branch.get('model', 'gpt-4o') if isinstance(branch, dict) else 'gpt-4o'
-                        branch_models.append(ADict(
-                            strategy=model, hypothesis=model, refiner=model,
-                        ))
-                gcri_config.branch_models = branch_models
+            config = _build_gcri_config(rui_config)
 
             asyncio.run_coroutine_threadsafe(
                 ws_manager.broadcast({
@@ -64,11 +99,8 @@ async def run_gcri_task(task_description, config, ws_manager):
                 loop,
             )
 
-            gcri = GCRI(gcri_config)
-
-            # TODO: Hook into GCRI's logger to bridge events to WS
-            # For now, simulate phase progression
-            result = gcri(task=task_description, abort_event=_abort_event)
+            gcri = GCRI(config, abort_event=_abort_event)
+            result = gcri(task=task_description)
 
             asyncio.run_coroutine_threadsafe(
                 ws_manager.broadcast({
