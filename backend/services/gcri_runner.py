@@ -92,10 +92,17 @@ async def run_gcri_task(task_description, rui_config, ws_manager):
                 loop,
             )
 
+            logger.info(f'GCRI result type: {type(result).__name__}')
+            if isinstance(result, dict):
+                logger.info(f'GCRI result keys: {list(result.keys())}')
+                logger.info(f'GCRI final_output value: {repr(result.get("final_output"))[:200]}')
+
             if result:
                 final_output = ''
                 if isinstance(result, dict):
-                    final_output = result.get('final_output', json.dumps(result, ensure_ascii=False, indent=2))
+                    final_output = result.get('final_output') or ''
+                    if not final_output:
+                        final_output = json.dumps(result, ensure_ascii=False, indent=2, default=str)
                 else:
                     final_output = str(result)
 
