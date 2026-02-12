@@ -52,6 +52,10 @@ def _build_config(config, rui_config=None):
             branch_agents.append(branch_agents[-1])
         config.agents.branches = branch_agents
 
+    max_iter = rui_config.get('maxIterations')
+    if max_iter:
+        config.protocols.max_iterations = int(max_iter)
+
     config.dashboard.enabled = False
 
     return config

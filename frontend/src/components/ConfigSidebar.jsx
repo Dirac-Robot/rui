@@ -77,6 +77,7 @@ function savePresetsToStorage(presets) {
 
 export default function ConfigSidebar({ config, onConfigChange, isRunning }) {
   const [branchCount, setBranchCount] = useState(config.branchCount || 3);
+  const [maxIterations, setMaxIterations] = useState(config.maxIterations || 3);
   const [branches, setBranches] = useState(
     config.branches || Array.from({ length: 3 }, makeBranch)
   );
@@ -89,7 +90,7 @@ export default function ConfigSidebar({ config, onConfigChange, isRunning }) {
   const [presetNameInput, setPresetNameInput] = useState('');
 
   function emitChange(updates) {
-    onConfigChange({ branchCount, branches, chatModel, globalRoles, ...updates });
+    onConfigChange({ branchCount, branches, chatModel, globalRoles, maxIterations, ...updates });
   }
 
   function savePreset() {
@@ -100,7 +101,7 @@ export default function ConfigSidebar({ config, onConfigChange, isRunning }) {
   function confirmSavePreset() {
     const key = presetNameInput.trim();
     if (!key) return;
-    const snapshot = { chatModel, branchCount, branches, globalRoles };
+    const snapshot = { chatModel, branchCount, branches, globalRoles, maxIterations };
     const updated = { ...presets, [key]: snapshot };
     setPresets(updated);
     savePresetsToStorage(updated);
@@ -114,13 +115,17 @@ export default function ConfigSidebar({ config, onConfigChange, isRunning }) {
     if (!preset) return;
     setChatModel(preset.chatModel || 'gpt-4o');
     setBranchCount(preset.branchCount || 3);
-    setBranches(preset.branches || Array.from({ length: 3 }, makeBranch));
+    setMaxIterations(preset.maxIterations || 3);
+    setBranches(
+      preset.branches || Array.from({ length: preset.branchCount || 3 }, makeBranch)
+    );
     setGlobalRoles(preset.globalRoles || { ...DEFAULT_GLOBAL_ROLES });
     setSelectedPreset(key);
     onConfigChange({
       chatModel: preset.chatModel || 'gpt-4o',
       branchCount: preset.branchCount || 3,
-      branches: preset.branches || Array.from({ length: 3 }, makeBranch),
+      maxIterations: preset.maxIterations || 3,
+      branches: preset.branches || Array.from({ length: preset.branchCount || 3 }, makeBranch),
       globalRoles: preset.globalRoles || { ...DEFAULT_GLOBAL_ROLES },
     });
   }
@@ -315,6 +320,51 @@ export default function ConfigSidebar({ config, onConfigChange, isRunning }) {
               }}
             >›</button>
             <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>개</span>
+          </div>
+        </div>
+
+        {/* Max Iterations — inline: MAX ITER  ‹ N › 회 */}
+        <div className="config-section" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <div className="config-section__label" style={{ marginBottom: 0 }}>Max Iterations</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+            <button
+              onClick={() => { const v = Math.max(1, maxIterations-1); setMaxIterations(v); emitChange({ maxIterations: v }); }}
+              disabled={isRunning || maxIterations <= 1}
+              style={{
+                width: 24, height: 24,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--surface-border)',
+                background: 'var(--bg-tertiary)',
+                color: maxIterations <= 1 ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                fontSize: 14, cursor: maxIterations <= 1 ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all var(--transition-fast)',
+              }}
+            >‹</button>
+            <span style={{
+              fontSize: 16, fontWeight: 700,
+              fontVariantNumeric: 'tabular-nums',
+              minWidth: 18, textAlign: 'center',
+            }}>{maxIterations}</span>
+            <button
+              onClick={() => { const v = Math.min(10, maxIterations+1); setMaxIterations(v); emitChange({ maxIterations: v }); }}
+              disabled={isRunning || maxIterations >= 10}
+              style={{
+                width: 24, height: 24,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--surface-border)',
+                background: 'var(--bg-tertiary)',
+                color: maxIterations >= 10 ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                fontSize: 14, cursor: maxIterations >= 10 ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all var(--transition-fast)',
+              }}
+            >›</button>
+            <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>회</span>
           </div>
         </div>
 
