@@ -219,73 +219,53 @@ export default function ChatPanel({
             </div>
           </div>
         )}
-        {messages.map((message, index) => (
-          <div key={index} className={`chat-message chat-message--${message.role}`}>
-            <div className="chat-message__role">
-              {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'RUI' : 'System'}
-            </div>
-            {editIndex === index ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                <textarea
-                  ref={editRef}
-                  value={editValue}
-                  onChange={(event) => {
-                    setEditValue(event.target.value);
-                    event.target.style.height = 'auto';
-                    event.target.style.height = event.target.scrollHeight + 'px';
-                  }}
-                  onKeyDown={handleEditKeyDown}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--accent-cyan)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'var(--text-primary)',
-                    resize: 'none',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                  <button onClick={cancelEdit} style={{
-                    padding: '4px 10px', fontSize: 11, borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--surface-border)', background: 'transparent',
-                    color: 'var(--text-secondary)', cursor: 'pointer',
-                  }}>Cancel</button>
-                  <button onClick={confirmEdit} style={{
-                    padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--accent-cyan)', background: 'var(--accent-cyan)',
-                    color: 'var(--bg-primary)', cursor: 'pointer',
-                  }}>Send</button>
-                </div>
+        {messages.map((message, index) => {
+          const bubble = (
+            <div key={message.role !== 'user' ? index : undefined} className={`chat-message chat-message--${message.role}`}>
+              <div className="chat-message__role">
+                {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'RUI' : 'System'}
               </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%' }}>
-                {message.role === 'user' && (
-                  <button
-                    className="edit-btn"
-                    onClick={() => startEdit(index)}
-                    title="Edit message"
-                    style={{
-                      flexShrink: 0,
-                      marginTop: 2,
-                      padding: '2px 6px',
-                      fontSize: 11,
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--surface-border)',
-                      background: 'var(--bg-secondary)',
-                      color: 'var(--text-tertiary)',
-                      cursor: 'pointer',
-                      opacity: 0,
-                      transition: 'opacity var(--transition-fast)',
+              {editIndex === index ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                  <textarea
+                    ref={editRef}
+                    value={editValue}
+                    onChange={(event) => {
+                      setEditValue(event.target.value);
+                      event.target.style.height = 'auto';
+                      event.target.style.height = event.target.scrollHeight + 'px';
                     }}
-                  >✏️</button>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }} className="chat-message__content">
+                    onKeyDown={handleEditKeyDown}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      background: 'var(--bg-tertiary)',
+                      border: '1px solid var(--accent-cyan)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--text-primary)',
+                      resize: 'none',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <button onClick={cancelEdit} style={{
+                      padding: '4px 10px', fontSize: 11, borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--surface-border)', background: 'transparent',
+                      color: 'var(--text-secondary)', cursor: 'pointer',
+                    }}>Cancel</button>
+                    <button onClick={confirmEdit} style={{
+                      padding: '4px 10px', fontSize: 11, fontWeight: 600, borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--accent-cyan)', background: 'var(--accent-cyan)',
+                      color: 'var(--bg-primary)', cursor: 'pointer',
+                    }}>Send</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="chat-message__content">
                   {message.content && (
                     <div className="markdown-content">
                       <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -299,10 +279,24 @@ export default function ChatPanel({
                     />
                   )}
                 </div>
+              )}
+            </div>
+          );
+
+          if (message.role === 'user') {
+            return (
+              <div key={index} className="chat-message-row chat-message-row--user">
+                <button
+                  className="edit-btn"
+                  onClick={() => startEdit(index)}
+                  title="Edit message"
+                >✏️</button>
+                {bubble}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          }
+          return bubble;
+        })}
         {isWaitingResponse && (
           <div className="chat-message chat-message--assistant">
             <div className="chat-message__role">RUI</div>

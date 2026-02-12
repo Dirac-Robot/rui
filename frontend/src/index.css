@@ -198,8 +198,41 @@ body {
   color: var(--text-primary);
 }
 
-.chat-message:hover .edit-btn {
-  opacity: 1 !important;
+.chat-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 85%;
+}
+
+.chat-message-row--user {
+  align-self: flex-end;
+  flex-direction: row;
+}
+
+.chat-message-row--user .chat-message {
+  align-self: auto;
+  max-width: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-btn {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-border);
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.chat-message-row:hover .edit-btn {
+  opacity: 1;
 }
 
 .chat-message--assistant {
