@@ -56,6 +56,31 @@ def get_comet_memory_nodes():
         return {'nodes': [], 'error': str(error)}
 
 
+def search_comet_memory(query, top_k=5):
+    """Semantic search over CoMeT memory using query string."""
+    comet = _get_comet()
+    if comet is None:
+        return {'results': [], 'error': 'CoMeT not available'}
+
+    try:
+        results = comet.retrieve(query, top_k=top_k)
+        items = []
+        for r in results:
+            node = r.node
+            items.append({
+                'node_id': node.node_id,
+                'summary': node.summary,
+                'trigger': node.trigger,
+                'topic_tags': node.topic_tags,
+                'relevance_score': round(r.relevance_score, 4),
+                'rank': r.rank,
+            })
+        return {'query': query, 'results': items}
+    except Exception as error:
+        logger.warning(f'CoMeT search failed: {error}')
+        return {'results': [], 'error': str(error)}
+
+
 def get_comet_sessions():
     """List all CoMeT sessions with metadata."""
     comet = _get_comet()

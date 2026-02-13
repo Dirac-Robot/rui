@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import GcriProposalCard from './GcriProposalCard';
+import GcriEventCard from './GcriEventCard';
 
 export default function ChatPanel({
   messages,
@@ -47,6 +48,7 @@ export default function ChatPanel({
   }
 
   function handleKeyDown(event) {
+    if (event.nativeEvent?.isComposing || event.isComposing) return;
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       handleSubmit(event);
@@ -223,7 +225,7 @@ export default function ChatPanel({
           const bubble = (
             <div key={message.role !== 'user' ? index : undefined} className={`chat-message chat-message--${message.role}`}>
               <div className="chat-message__role">
-                {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'RUI' : 'System'}
+                {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'RUI' : message.role === 'gcri_progress' ? 'GCRI' : message.role === 'error' ? 'Error' : 'System'}
               </div>
               {editIndex === index ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
@@ -266,17 +268,27 @@ export default function ChatPanel({
                 </div>
               ) : (
                 <div className="chat-message__content">
-                  {message.content && (
-                    <div className="markdown-content">
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    </div>
-                  )}
-                  {message.proposal && (
-                    <GcriProposalCard
-                      scheme={message.proposal}
-                      onConfirm={onConfirmTask}
-                      confirmed={message.proposalConfirmed}
+                  {message.gcriType ? (
+                    <GcriEventCard
+                      gcriType={message.gcriType}
+                      summary={message.summary || ''}
+                      detail={message.detail}
                     />
+                  ) : (
+                    <>
+                      {message.content && (
+                        <div className="markdown-content">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      )}
+                      {message.proposal && (
+                        <GcriProposalCard
+                          scheme={message.proposal}
+                          onConfirm={onConfirmTask}
+                          confirmed={message.proposalConfirmed}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -292,8 +304,8 @@ export default function ChatPanel({
                   title="Edit message"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                    <path d="m15 5 4 4"/>
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
                   </svg>
                 </button>
                 {bubble}

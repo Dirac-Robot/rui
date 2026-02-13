@@ -3,7 +3,7 @@ import json
 from loguru import logger
 
 from services import gcri_runner
-from services.comet_bridge import get_comet_memory_nodes, get_gcri_memory
+from services.comet_bridge import get_comet_memory_nodes, search_comet_memory, get_gcri_memory
 
 
 async def execute_tool(tool_name, arguments, config, ws_manager):
@@ -52,8 +52,12 @@ async def execute_tool(tool_name, arguments, config, ws_manager):
 
     elif tool_name == 'query_memory':
         source = arguments.get('source', 'gcri')
+        query = arguments.get('query', '')
         if source == 'comet':
-            data = get_comet_memory_nodes()
+            if query:
+                data = search_comet_memory(query)
+            else:
+                data = get_comet_memory_nodes()
         else:
             data = get_gcri_memory()
         return json.dumps(data, ensure_ascii=False, default=str)

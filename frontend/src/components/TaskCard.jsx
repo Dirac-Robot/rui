@@ -1,9 +1,10 @@
 import { useState } from 'react';
 
-const PHASES = ['strategy', 'aggregation', 'verification', 'decision', 'memory'];
+const PHASES = ['strategy', 'execution', 'aggregation', 'verification', 'decision', 'memory'];
 
 const PHASE_LABELS = {
   strategy: 'Strategy',
+  execution: 'Execution',
   aggregation: 'Aggregation',
   verification: 'Verification',
   decision: 'Decision',
@@ -14,6 +15,7 @@ const PHASE_LABELS = {
 
 const PHASE_ICONS = {
   strategy: '🎯',
+  execution: '⚡',
   aggregation: '🔀',
   verification: '🔍',
   decision: '⚖️',
@@ -32,7 +34,7 @@ function IterationGroup({ iterNum, items }) {
   return (
     <div className="task-detail__iteration">
       <div className="task-detail__iter-header">
-        Iteration {iterNum+1}
+        Iteration {iterNum + 1}
         {iterComplete && (
           <span className={`task-detail__iter-badge ${iterComplete.decision ? 'task-detail__iter-badge--accept' : 'task-detail__iter-badge--reject'}`}>
             {iterComplete.decision ? '✅ Accepted' : '🔁 Continuing'}
@@ -79,7 +81,7 @@ function IterationGroup({ iterNum, items }) {
         <div key={`dec-${i}`} className={`task-detail__item task-detail__item--decision ${d.decision ? 'task-detail__item--accept' : ''}`}>
           <span className="task-detail__icon">{d.decision ? '✅' : '❌'}</span>
           <div>
-            <strong>{d.decision ? `Accepted (Branch #${d.bestBranch+1})` : 'Rejected'}</strong>
+            <strong>{d.decision ? `Accepted (Branch #${d.bestBranch + 1})` : 'Rejected'}</strong>
             {d.feedback && <p>{d.feedback}</p>}
           </div>
         </div>
@@ -89,7 +91,7 @@ function IterationGroup({ iterNum, items }) {
         <div className="task-detail__evals">
           {iterComplete.evaluations.map((ev, i) => (
             <div key={i} className={`task-detail__eval task-detail__eval--${ev.status}`}>
-              <span>B{ev.branch_index+1}</span>
+              <span>B{ev.branch_index + 1}</span>
               <span className="task-detail__eval-status">{ev.status}</span>
               <span className="task-detail__eval-hyp">{ev.summary_hypothesis}</span>
             </div>
@@ -129,13 +131,13 @@ export default function TaskCard({ task, index }) {
     if (!iterationMap[iter]) iterationMap[iter] = [];
     iterationMap[iter].push(d);
   });
-  const iterationKeys = Object.keys(iterationMap).map(Number).sort((a, b) => a-b);
+  const iterationKeys = Object.keys(iterationMap).map(Number).sort((a, b) => a - b);
 
   return (
     <div className={`task-card ${expanded ? 'task-card--expanded' : ''}`}>
       <div className="task-card__header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
         <span className="task-card__iteration">
-          {PHASE_ICONS[task.phase] || '📌'} Iteration {(task.iterationIndex ?? 0)+1}
+          {PHASE_ICONS[task.phase] || '📌'} Iteration {(task.iterationIndex ?? 0) + 1}
         </span>
         <span className={`task-card__phase task-card__phase--${task.phase || 'idle'}`}>
           {PHASE_LABELS[task.phase] || task.phase || 'Idle'}
@@ -156,6 +158,20 @@ export default function TaskCard({ task, index }) {
           {iterationKeys.map((iterNum) => (
             <IterationGroup key={iterNum} iterNum={iterNum} items={iterationMap[iterNum]} />
           ))}
+        </div>
+      )}
+
+      {expanded && iterationKeys.length === 0 && (
+        <div style={{
+          padding: '12px 8px',
+          fontSize: 12,
+          color: 'var(--text-tertiary)',
+          textAlign: 'center',
+          lineHeight: 1.6,
+        }}>
+          {task.phase === 'idle' || task.phase === 'complete'
+            ? 'No detailed logs available for this task.'
+            : 'Waiting for data... Logs will appear as GCRI progresses.'}
         </div>
       )}
 

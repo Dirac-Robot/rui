@@ -57,8 +57,10 @@ TOOLS = [
         'function': {
             'name': 'query_memory',
             'description': (
-                'Search past experiment memory. Use CoMeT for semantic/contextual memory, '
-                'GCRI for rules and domain-specific knowledge learned from previous tasks.'
+                'Search past experiment memory. '
+                'CoMeT: semantic memory from conversations. If a query is provided, performs '
+                'semantic search and returns ranked results. Without query, returns all nodes. '
+                'GCRI: rules and domain-specific knowledge learned from previous tasks.'
             ),
             'parameters': {
                 'type': 'object',
@@ -70,7 +72,7 @@ TOOLS = [
                     },
                     'query': {
                         'type': 'string',
-                        'description': 'Optional search term to filter results.',
+                        'description': 'Search query for semantic retrieval (CoMeT). Leave empty to list all.',
                     },
                 },
                 'required': ['source'],

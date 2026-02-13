@@ -73,6 +73,7 @@ function App() {
   });
   const [taskState, setTaskState] = useState({ tasks: [] });
   const [missingProviders, setMissingProviders] = useState(null);
+  const [manualKeyModal, setManualKeyModal] = useState(false);
   const [toasts, setToasts] = useState([]);
   const toastIdRef = useRef(0);
   const pendingMessageRef = useRef(null);
@@ -112,7 +113,7 @@ function App() {
     if (data.type === 'phase_change') {
       setTaskState((prev) => {
         const tasks = [...prev.tasks];
-        const currentTask = tasks[tasks.length-1] || {
+        const currentTask = tasks[tasks.length - 1] || {
           phase: 'idle',
           iterationIndex: 0,
           branches: [],
@@ -123,25 +124,34 @@ function App() {
         }
         if (data.phase === 'strategy') {
           setIsRunning(true);
-          if (!tasks.length || tasks[tasks.length-1].phase === 'complete') {
+          if (!tasks.length || tasks[tasks.length - 1].phase === 'complete') {
             tasks.push({ ...currentTask, phase: 'strategy' });
           } else {
-            tasks[tasks.length-1] = currentTask;
+            tasks[tasks.length - 1] = currentTask;
           }
-        } else if (data.phase === 'complete' || data.phase === 'idle') {
+        } else if (data.phase === 'complete' || data.phase === 'idle' || data.phase === 'aborted') {
           setIsRunning(false);
-          if (tasks.length) tasks[tasks.length-1] = currentTask;
+          if (tasks.length) tasks[tasks.length - 1] = currentTask;
         } else {
-          if (tasks.length) tasks[tasks.length-1] = currentTask;
+          if (tasks.length) tasks[tasks.length - 1] = currentTask;
           else tasks.push(currentTask);
         }
         return { tasks };
       });
+      if (data.phase === 'strategy' && data.maxIterations) {
+        const iter = `Iteration ${(data.iteration ?? 0) + 1}/${data.maxIterations}`;
+        updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'iteration_start', summary: iter, detail: null }]);
+      } else if (data.phase === 'complete') {
+        const elapsed = data.elapsed ? ` in ${data.elapsed}s` : '';
+        updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'complete', summary: `GCRI complete${elapsed}`, detail: null }]);
+      } else if (data.phase === 'aborted') {
+        updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'aborted', summary: '🛑 GCRI task aborted', detail: null }]);
+      }
     } else if (data.type === 'node_update') {
       setTaskState((prev) => {
         const tasks = [...prev.tasks];
         if (tasks.length === 0) return prev;
-        const currentTask = { ...tasks[tasks.length-1] };
+        const currentTask = { ...tasks[tasks.length - 1] };
         if (data.branch_index !== undefined) {
           const branches = [...(currentTask.branches || [])];
           while (branches.length <= data.branch_index) {
@@ -155,22 +165,78 @@ function App() {
           };
           currentTask.branches = branches;
         }
-        tasks[tasks.length-1] = currentTask;
+        tasks[tasks.length - 1] = currentTask;
         return { tasks };
       });
-    } else if (data.type === 'strategies' || data.type === 'hypothesis' ||
-               data.type === 'verification' || data.type === 'decision' ||
-               data.type === 'iteration_complete') {
+    } else if (data.type === 'strategies') {
       setTaskState((prev) => {
         const tasks = [...prev.tasks];
         if (tasks.length === 0) return prev;
-        const currentTask = { ...tasks[tasks.length-1] };
+        const currentTask = { ...tasks[tasks.length - 1] };
         const details = [...(currentTask.details || [])];
         details.push(data);
         currentTask.details = details;
-        tasks[tasks.length-1] = currentTask;
+        tasks[tasks.length - 1] = currentTask;
         return { tasks };
       });
+      const names = (data.strategies || []).map((s) => s.name).filter(Boolean);
+      const summary = names.length ? names.join(', ') : `${(data.strategies || []).length} strategies`;
+      updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'strategies', summary, detail: data }]);
+    } else if (data.type === 'hypothesis') {
+      setTaskState((prev) => {
+        const tasks = [...prev.tasks];
+        if (tasks.length === 0) return prev;
+        const currentTask = { ...tasks[tasks.length - 1] };
+        const details = [...(currentTask.details || [])];
+        details.push(data);
+        currentTask.details = details;
+        tasks[tasks.length - 1] = currentTask;
+        return { tasks };
+      });
+      const preview = data.hypothesis ? data.hypothesis.slice(0, 120) : '';
+      const branchLabel = `Branch ${(data.branch || 0) + 1}`;
+      updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'hypothesis', summary: `${branchLabel}: ${preview}${data.hypothesis?.length > 120 ? '…' : ''}`, detail: data }]);
+    } else if (data.type === 'verification') {
+      setTaskState((prev) => {
+        const tasks = [...prev.tasks];
+        if (tasks.length === 0) return prev;
+        const currentTask = { ...tasks[tasks.length - 1] };
+        const details = [...(currentTask.details || [])];
+        details.push(data);
+        currentTask.details = details;
+        tasks[tasks.length - 1] = currentTask;
+        return { tasks };
+      });
+      updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'verification', summary: `Branch ${(data.branch || 0) + 1} — ${data.counterStrength || 'n/a'}`, detail: data }]);
+    } else if (data.type === 'decision') {
+      setTaskState((prev) => {
+        const tasks = [...prev.tasks];
+        if (tasks.length === 0) return prev;
+        const currentTask = { ...tasks[tasks.length - 1] };
+        const details = [...(currentTask.details || [])];
+        details.push(data);
+        currentTask.details = details;
+        tasks[tasks.length - 1] = currentTask;
+        return { tasks };
+      });
+      const gcriType = data.decision ? 'decision_accept' : 'decision_reject';
+      const summary = data.decision
+        ? `Accepted — best branch: ${(data.bestBranch || 0) + 1}`
+        : `Rejected${data.feedback ? ': ' + data.feedback.slice(0, 120) + '…' : ''}`;
+      updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType, summary, detail: data }]);
+    } else if (data.type === 'iteration_complete') {
+      setTaskState((prev) => {
+        const tasks = [...prev.tasks];
+        if (tasks.length === 0) return prev;
+        const currentTask = { ...tasks[tasks.length - 1] };
+        const details = [...(currentTask.details || [])];
+        details.push(data);
+        currentTask.details = details;
+        tasks[tasks.length - 1] = currentTask;
+        return { tasks };
+      });
+    } else if (data.type === 'gcri_result') {
+      updateMessages((prev) => [...prev, { role: 'gcri_progress', gcriType: 'result', summary: 'Final Output', detail: { finalOutput: data.final_output || '' } }]);
     } else if (data.type === 'chat_response') {
       setIsWaitingResponse(false);
       updateMessages((prev) => [
@@ -180,6 +246,10 @@ function App() {
     } else if (data.type === 'system_message') {
       if (data.content?.toLowerCase().includes('error')) {
         addToast(data.content);
+        updateMessages((prev) => [
+          ...prev,
+          { role: 'error', content: data.content },
+        ]);
       } else {
         updateMessages((prev) => [
           ...prev,
@@ -205,10 +275,11 @@ function App() {
 
   const handleConfirmTask = useCallback(async (scheme) => {
     try {
+      const payload = { ...scheme, max_iterations: config.maxIterations || 3 };
       const response = await fetch(`${API_BASE}/api/task/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(scheme),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error(`Confirm API error: ${response.status}`);
 
@@ -224,8 +295,8 @@ function App() {
     }
   }, [activeSessionId]);
 
-  const doSendMessage = useCallback(async (content) => {
-    const currentMessages = sessions[activeSessionId]?.messages || [];
+  const doSendMessage = useCallback(async (content, baseMessages = null) => {
+    const currentMessages = baseMessages ?? sessions[activeSessionId]?.messages ?? [];
     const updatedMessages = [...currentMessages, { role: 'user', content }];
     updateMessages(updatedMessages);
     setIsWaitingResponse(true);
@@ -308,8 +379,7 @@ function App() {
     }
     const currentMessages = sessions[activeSessionId]?.messages || [];
     const truncated = currentMessages.slice(0, index);
-    updateMessages(truncated);
-    setTimeout(() => doSendMessage(newContent), 50);
+    doSendMessage(newContent, truncated);
   }, [config, sessions, activeSessionId, doSendMessage]);
 
   const handleNewChat = useCallback(() => {
@@ -349,6 +419,7 @@ function App() {
   const handleKeysSubmit = useCallback(async (keys) => {
     await setApiKeys(keys);
     setMissingProviders(null);
+    setManualKeyModal(false);
     if (pendingMessageRef.current) {
       const pending = pendingMessageRef.current;
       pendingMessageRef.current = null;
@@ -358,7 +429,13 @@ function App() {
 
   const handleKeysCancel = useCallback(() => {
     setMissingProviders(null);
+    setManualKeyModal(false);
     pendingMessageRef.current = null;
+  }, []);
+
+  const handleOpenApiKeys = useCallback(() => {
+    setMissingProviders(['openai', 'anthropic', 'google']);
+    setManualKeyModal(true);
   }, []);
 
   const handleConfigChange = useCallback((newConfig) => {
@@ -374,6 +451,7 @@ function App() {
         config={config}
         onConfigChange={handleConfigChange}
         isRunning={isRunning}
+        onOpenApiKeys={handleOpenApiKeys}
       />
       <ChatPanel
         messages={messages}
@@ -388,7 +466,7 @@ function App() {
         isConnected={isConnected}
         isWaitingResponse={isWaitingResponse}
       />
-      <ProgressSidebar taskState={taskState} />
+      <ProgressSidebar taskState={taskState} isRunning={isRunning} />
       <Toast messages={toasts} onDismiss={dismissToast} />
       {missingProviders && (
         <ApiKeyModal

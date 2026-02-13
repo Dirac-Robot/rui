@@ -1,7 +1,11 @@
+import json
 import os
+from pathlib import Path
+
 from loguru import logger
 
 
+_CACHE_PATH = Path.home() / '.rui' / 'keys.json'
 _runtime_keys = {}
 
 PROVIDER_KEY_MAP = {
@@ -50,12 +54,37 @@ def _mask_key(key):
     return key[:4] + '...' + key[-4:]
 
 
+def _save_cache():
+    _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _CACHE_PATH.write_text(json.dumps(_runtime_keys, indent=2))
+    _CACHE_PATH.chmod(0o600)
+
+
+def _load_cached_keys():
+    if not _CACHE_PATH.exists():
+        return
+    try:
+        cached = json.loads(_CACHE_PATH.read_text())
+        for env_var, key in cached.items():
+            _runtime_keys[env_var] = key
+            os.environ[env_var] = key
+        if cached:
+            providers = [p for p, ev in PROVIDER_KEY_MAP.items() if ev in cached]
+            logger.info(f'Loaded cached API keys for: {providers}')
+    except Exception as error:
+        logger.warning(f'Failed to load cached keys: {error}')
+
+
+_load_cached_keys()
+
+
 def set_key(provider, key):
     env_var = PROVIDER_KEY_MAP.get(provider)
     if not env_var:
         raise ValueError(f'Unknown provider: {provider}')
     _runtime_keys[env_var] = key
     os.environ[env_var] = key
+    _save_cache()
     logger.info(f'API key set for {provider} ({_mask_key(key)})')
 
 

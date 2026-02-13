@@ -16,6 +16,7 @@ class ConfirmTaskRequest(BaseModel):
     task_description: str
     commit_mode: str = 'manual'
     branch_count: int = 3
+    max_iterations: int = 3
     branch_models: list = []
     global_roles: dict = {}
 
@@ -36,6 +37,7 @@ async def confirm_task(request: ConfirmTaskRequest):
 
     config = {
         'branchCount': request.branch_count,
+        'maxIterations': request.max_iterations,
         'branches': [{'model': m} for m in request.branch_models],
         'globalRoles': request.global_roles,
         'commit_mode': request.commit_mode,

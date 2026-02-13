@@ -130,6 +130,16 @@ class WebCallbacks(GCRICallbacks):
             'phase': 'idle',
         })
 
+    def on_task_abort(self, error):
+        self._send({
+            'type': 'system_message',
+            'content': '🛑 GCRI task aborted by user.',
+        })
+        self._send({
+            'type': 'phase_change',
+            'phase': 'aborted',
+        })
+
 
 @scope
 def _build_config(config, rui_config=None):
@@ -151,7 +161,7 @@ def _build_config(config, rui_config=None):
             branch_agents.append({
                 agent_name: ADict(
                     model_id=model,
-                    parameters=dict(max_tokens=25600, reasoning_effort='low'),
+                    parameters=dict(max_completion_tokens=16384),
                     gcri_options=ADict(
                         use_code_tools=True,
                         use_web_search=True,
@@ -168,6 +178,7 @@ def _build_config(config, rui_config=None):
         config.protocols.max_iterations = int(max_iter)
 
     config.dashboard.enabled = False
+    config.use_comet = True
 
     return config
 
@@ -198,15 +209,21 @@ async def run_gcri_task(task_description, rui_config, ws_manager):
                 final_output = ''
                 if isinstance(result, dict):
                     final_output = result.get('final_output') or ''
-                    if not final_output:
-                        final_output = json.dumps(result, ensure_ascii=False, indent=2, default=str)
+                    if hasattr(final_output, 'model_dump'):
+                        final_output = json.dumps(final_output.model_dump(), ensure_ascii=False, indent=2)
+                    elif isinstance(final_output, dict):
+                        final_output = json.dumps(final_output, ensure_ascii=False, indent=2)
+                    elif not isinstance(final_output, str):
+                        final_output = str(final_output)
                 else:
                     final_output = str(result)
 
                 asyncio.run_coroutine_threadsafe(
                     ws_manager.broadcast({
-                        'type': 'chat_response',
-                        'content': final_output,
+                        'type': 'gcri_result',
+                        'final_output': final_output,
+                        'best_branch': result.get('best_branch_index') if isinstance(result, dict) else None,
+                        'iterations': result.get('count') if isinstance(result, dict) else None,
                     }),
                     loop,
                 )

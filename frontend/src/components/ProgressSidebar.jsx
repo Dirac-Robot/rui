@@ -6,9 +6,10 @@ import {
   fetchCometSessions,
   fetchCometSessionNodes,
   fetchGcriMemory,
+  abortTask,
 } from '../utils/api';
 
-export default function ProgressSidebar({ taskState }) {
+export default function ProgressSidebar({ taskState, isRunning }) {
   const [activeTab, setActiveTab] = useState('progress');
   const [memoryTab, setMemoryTab] = useState('comet');
   const [cometMemory, setCometMemory] = useState([]);
@@ -16,9 +17,11 @@ export default function ProgressSidebar({ taskState }) {
   const [cometSessions, setCometSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState('all');
   const [memoryLoading, setMemoryLoading] = useState(false);
+  const [memoryError, setMemoryError] = useState(null);
 
   const loadMemory = useCallback(async (tab, sessionFilter) => {
     setMemoryLoading(true);
+    setMemoryError(null);
     try {
       if (tab === 'comet') {
         const sessData = await fetchCometSessions();
@@ -55,8 +58,8 @@ export default function ProgressSidebar({ taskState }) {
         }
         setGcriMemory(items);
       }
-    } catch {
-      // API not yet available
+    } catch (error) {
+      setMemoryError(`Failed to load ${tab} memory: ${error.message || 'server unavailable'}`);
     } finally {
       setMemoryLoading(false);
     }
@@ -95,6 +98,34 @@ export default function ProgressSidebar({ taskState }) {
 
         {activeTab === 'progress' && (
           <div>
+            {isRunning && (
+              <button
+                onClick={async () => {
+                  try { await abortTask(); } catch (e) { /* ignore */ }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginBottom: 12,
+                  background: 'rgba(248, 81, 73, 0.12)',
+                  border: '1px solid rgba(248, 81, 73, 0.4)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--accent-red, #f85149)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(248, 81, 73, 0.22)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(248, 81, 73, 0.12)'}
+              >
+                🛑 Stop GCRI
+              </button>
+            )}
             {taskState.tasks && taskState.tasks.length > 0 ? (
               taskState.tasks.map((task, index) => (
                 <TaskCard key={index} task={task} />
@@ -158,6 +189,18 @@ export default function ProgressSidebar({ taskState }) {
                 <span className="loading-dot" />
                 <span className="loading-dot" />
                 <span className="loading-dot" />
+              </div>
+            ) : memoryError ? (
+              <div style={{
+                padding: '12px',
+                background: 'rgba(248, 81, 73, 0.08)',
+                border: '1px solid rgba(248, 81, 73, 0.2)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--accent-red)',
+                fontSize: 12,
+                lineHeight: 1.6,
+              }}>
+                ⚠️ {memoryError}
               </div>
             ) : (
               <MemoryViewer
